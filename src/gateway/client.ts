@@ -227,6 +227,15 @@ export class GatewayClient {
       // Clear persisted device auth state only when device-token auth was active.
       // Shared token/password failures can return the same close reason but should
       // not erase a valid cached device token.
+      // Log additional debug info for CLI mode to help diagnose auth issues
+      if (this.opts.mode === GATEWAY_CLIENT_MODES.CLI) {
+        const reason = reasonText.toLowerCase();
+        if (reason.includes("device token mismatch")) {
+          logDebug(`CLI device token mismatch - clearing stale device-auth for device ${this.opts.deviceIdentity?.deviceId}`);
+        } else if (reason.includes("authentication failed") || reason.includes("unauthorized")) {
+          logDebug(`CLI authentication failed - reason: ${reasonText}`);
+        }
+      }
       if (
         code === 1008 &&
         reasonText.toLowerCase().includes("device token mismatch") &&
@@ -604,7 +613,12 @@ export class GatewayClient {
       if (this.connectSent || this.ws?.readyState !== WebSocket.OPEN) {
         return;
       }
-      this.opts.onConnectError?.(new Error("gateway connect challenge timeout"));
+      // Provide more helpful error message for auth-related timeouts
+      const hasCredentials = Boolean(this.opts.token || this.opts.password || this.opts.deviceToken);
+      const errorMsg = hasCredentials
+        ? "gateway connect challenge timeout - authentication may have failed. Check your token/password and ensure Gateway is running with correct auth configuration."
+        : "gateway connect challenge timeout - no credentials provided. Configure gateway.auth.token or use --token CLI option.";
+      this.opts.onConnectError?.(new Error(errorMsg));
       this.ws?.close(1008, "connect challenge timeout");
     }, connectChallengeTimeoutMs);
   }
