@@ -371,6 +371,39 @@ type ConfiguredModelOption = {
   label: string;
 };
 
+/**
+ * Normalizes a model ID to always include a provider prefix.
+ * If the model already includes a provider (contains "/"), returns it as-is.
+ * Otherwise, tries to find the correct provider from configured models.
+ * This ensures that bare model IDs like "glm-5" are resolved to "bailian/glm-5"
+ * when multiple providers are configured.
+ */
+export function normalizeModelIdForSelection(
+  modelId: string,
+  configuredModels: Record<string, unknown> | undefined,
+): string | null {
+  const trimmed = modelId.trim();
+  if (!trimmed) {
+    return null;
+  }
+  // If it already has a provider prefix, use it as-is
+  if (trimmed.includes("/")) {
+    return trimmed;
+  }
+  // It's a bare model ID - try to find the correct provider from configured models
+  if (configuredModels && typeof configuredModels === "object") {
+    for (const key of Object.keys(configuredModels)) {
+      const configuredKey = key.trim();
+      // Check if this configured model ends with the bare model ID
+      if (configuredKey.endsWith(`/${trimmed}`)) {
+        return configuredKey;
+      }
+    }
+  }
+  // Could not find a matching configured model - return as-is (will use default provider)
+  return trimmed;
+}
+
 function resolveConfiguredModels(
   configForm: Record<string, unknown> | null,
 ): ConfiguredModelOption[] {

@@ -69,6 +69,7 @@ import { buildExternalLinkRel, EXTERNAL_LINK_TARGET } from "./external-link.ts";
 import { icons } from "./icons.ts";
 import { normalizeBasePath, TAB_GROUPS, subtitleForTab, titleForTab } from "./navigation.ts";
 import {
+  normalizeModelIdForSelection,
   resolveAgentConfig,
   resolveConfiguredCronModelSuggestions,
   resolveEffectiveModelFallbacks,
@@ -776,6 +777,11 @@ export function renderApp(state: AppViewState) {
                     removeConfigFormValue(state, basePath);
                     return;
                   }
+                  // Normalize the model ID to ensure it has the correct provider prefix
+                  // This fixes the bug where bare model IDs are sent with wrong provider prefix
+                  const configuredModels = (getCurrentConfigValue() as { agents?: { defaults?: { models?: Record<string, unknown> } } } | null)
+                    ?.agents?.defaults?.models;
+                  const normalizedModelId = normalizeModelIdForSelection(modelId, configuredModels) ?? modelId;
                   const entry = Array.isArray(list)
                     ? (list[index] as { model?: unknown })
                     : undefined;
@@ -783,12 +789,12 @@ export function renderApp(state: AppViewState) {
                   if (existing && typeof existing === "object" && !Array.isArray(existing)) {
                     const fallbacks = (existing as { fallbacks?: unknown }).fallbacks;
                     const next = {
-                      primary: modelId,
+                      primary: normalizedModelId,
                       ...(Array.isArray(fallbacks) ? { fallbacks } : {}),
                     };
                     updateConfigFormValue(state, basePath, next);
                   } else {
-                    updateConfigFormValue(state, basePath, modelId);
+                    updateConfigFormValue(state, basePath, normalizedModelId);
                   }
                 },
                 onModelFallbacksChange: (agentId, fallbacks) => {
